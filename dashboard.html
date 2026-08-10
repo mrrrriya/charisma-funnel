@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Funnel dashboard — Charisma Signature</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#17111F;--surface:#221A30;--text:#F0E9F5;--mute:#A294B4;--edge:rgba(255,255,255,.1);
+  --ember:#FF9D5C;--iris:#9B8CFF;--good:#5DCAA5;
+  --fd:"Bricolage Grotesque",sans-serif;--fb:"Instrument Sans",system-ui,sans-serif}
+@media(prefers-color-scheme:light){:root{--bg:#F6F2F7;--surface:#fff;--text:#251B33;--mute:#6B5F7D;
+  --edge:rgba(37,27,51,.12);--ember:#D2622A;--iris:#6A56D6;--good:#1D9E75}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--fb);padding:28px 20px 60px}
+.wrap{max-width:840px;margin:0 auto}
+h1{font-family:var(--fd);font-size:1.8rem;font-weight:800;letter-spacing:-.03em;margin:0}
+h2{font-family:var(--fd);font-size:1.05rem;font-weight:600;margin:0 0 14px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.pill{font-size:11px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--edge);
+  border-radius:99px;padding:5px 11px;color:var(--mute)}
+.pill.warn{color:var(--ember);border-color:var(--ember)}
+.sub{color:var(--mute);font-size:14px;margin:6px 0 26px}
+.card{background:var(--surface);border:1px solid var(--edge);border-radius:16px;padding:20px;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:12px;margin-bottom:9px;font-size:14px}
+.row .nm{flex:0 0 148px;color:var(--mute)}
+.bar{flex:1;height:22px;background:var(--edge);border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ember),var(--iris));
+  border-radius:6px;transition:width .6s cubic-bezier(.22,.9,.28,1)}
+.num{flex:0 0 116px;text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+.num b{font-weight:600}
+.num s{color:var(--mute);text-decoration:none;margin-left:7px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--edge)}
+th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-weight:600}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.win{color:var(--good);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--edge);border-radius:16px;padding:16px}
+.kpi b{display:block;font-family:var(--fd);font-size:1.7rem;font-weight:800;letter-spacing:-.03em}
+.kpi span{font-size:12px;color:var(--mute)}
+button{font:inherit;background:transparent;color:var(--text);border:1px solid var(--edge);
+  border-radius:10px;padding:8px 14px;cursor:pointer;font-size:13px}
+button:hover{border-color:var(--ember)}
+.qbars{display:flex;gap:5px;align-items:flex-end;height:110px;margin-top:6px}
+.qbars div{flex:1;background:var(--iris);border-radius:5px 5px 0 0;position:relative;min-height:3px;opacity:.85}
+.qlab{display:flex;gap:5px;margin-top:6px}
+.qlab span{flex:1;text-align:center;font-size:11px;color:var(--mute)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>Funnel dashboard</h1>
+    <span class="pill" id="store">checking…</span>
+    <button id="refresh">Refresh</button>
+  </div>
+  <p class="sub">Charisma Signature · counters only, no personal data stored.</p>
+
+  <div class="grid" style="margin-bottom:14px">
+    <div class="kpi"><b id="k-views">–</b><span>Landed</span></div>
+    <div class="kpi"><b id="k-starts">–</b><span>Started quiz</span></div>
+    <div class="kpi"><b id="k-leads">–</b><span>Leads captured</span></div>
+    <div class="kpi"><b id="k-cvr">–</b><span>Land → lead</span></div>
+  </div>
+
+  <div class="card"><h2>Funnel drop-off</h2><div id="funnel"></div></div>
+
+  <div class="card"><h2>Answers per question</h2>
+    <div class="qbars" id="qbars"></div><div class="qlab" id="qlab"></div>
+  </div>
+
+  <div class="card"><h2>A/B — hero copy</h2><div id="ab-hero"></div></div>
+  <div class="card"><h2>A/B — locked vs open Day 1</h2><div id="ab-lock"></div></div>
+  <div class="card"><h2>Language</h2><div id="loc"></div></div>
+  <div class="card"><h2>Referral</h2><div id="ref"></div></div>
+</div>
+
+<script>
+const NAMES = {funnel_view:'Landed',quiz_start:'Started',gauge_view:'Saw summary',reveal_view:'Saw result',
+  email_view:'Reached email',lead_submitted:'Submitted',success_view:'Saw Day 1'};
+const pct = (a,b) => b ? Math.round(a/b*1000)/10 : 0;
+const el = id => document.getElementById(id);
+
+function bars(host, rows, base) {
+  host.innerHTML = rows.map(([nm,c]) =>
+    `<div class="row"><span class="nm">${nm}</span>
+     <span class="bar"><i style="width:${base?Math.max(1,c/base*100):0}%"></i></span>
+     <span class="num"><b>${c}</b><s>${pct(c,base)}%</s></span></div>`).join('');
+}
+
+function abTable(host, arm, label) {
+  const A = arm.a, B = arm.b;
+  const cvr = x => pct(x.lead_submitted, x.funnel_view);
+  const win = cvr(A) === cvr(B) ? null : (cvr(A) > cvr(B) ? 'a' : 'b');
+  host.innerHTML = `<table><tr><th>Arm</th><th class="n">Landed</th><th class="n">Started</th>
+    <th class="n">Reached email</th><th class="n">Leads</th><th class="n">Land → lead</th></tr>` +
+    ['a','b'].map(k => {
+      const x = arm[k];
+      return `<tr><td>${label[k]}</td><td class="n">${x.funnel_view}</td><td class="n">${x.quiz_start}</td>
+      <td class="n">${x.email_view}</td><td class="n">${x.lead_submitted}</td>
+      <td class="n ${win===k?'win':''}">${cvr(x)}%</td></tr>`;
+    }).join('') + '</table>' +
+    (A.funnel_view + B.funnel_view < 200
+      ? '<p class="sub" style="margin:12px 0 0">Sample still small — treat any gap as noise until each arm passes ~100 landings.</p>' : '');
+}
+
+async function load() {
+  const r = await fetch('/api/stats', { cache:'no-store' });
+  const d = await r.json();
+
+  el('store').textContent = d.persistent ? 'persistent store' : 'in-memory (not persistent)';
+  el('store').className = 'pill' + (d.persistent ? '' : ' warn');
+
+  const get = s => (d.funnel.find(f => f.step === s) || {}).count || 0;
+  const views = get('funnel_view'), starts = get('quiz_start'), leads = get('lead_submitted');
+  el('k-views').textContent = views; el('k-starts').textContent = starts;
+  el('k-leads').textContent = leads; el('k-cvr').textContent = pct(leads, views) + '%';
+
+  bars(el('funnel'), d.funnel.map(f => [NAMES[f.step] || f.step, f.count]), views);
+
+  const max = Math.max(1, ...d.questions.map(q => q.count));
+  el('qbars').innerHTML = d.questions.map(q => `<div style="height:${Math.max(3,q.count/max*100)}%" title="Q${q.n}: ${q.count}"></div>`).join('');
+  el('qlab').innerHTML = d.questions.map(q => `<span>${q.n}</span>`).join('');
+
+  abTable(el('ab-hero'), d.arms.hero, { a:'A · thesis line', b:'B · benefit line' });
+  abTable(el('ab-lock'), d.arms.lock, { a:'A · Day 1 locked', b:'B · Day 1 open' });
+
+  const locNames = { en:'English', uk:'Українська', pl:'Polski' };
+  const locBase = Math.max(1, ...Object.values(d.locales).map(x => x.funnel_view));
+  el('loc').innerHTML = '<table><tr><th>Language</th><th class="n">Landed</th><th class="n">Leads</th><th class="n">Rate</th></tr>' +
+    Object.entries(d.locales).map(([k,x]) =>
+      `<tr><td>${locNames[k]||k}</td><td class="n">${x.funnel_view}</td><td class="n">${x.lead_submitted}</td>
+       <td class="n">${pct(x.lead_submitted, x.funnel_view)}%</td></tr>`).join('') + '</table>';
+
+  el('ref').innerHTML = `<div class="row"><span class="nm">Shares</span>
+    <span class="bar"><i style="width:${Math.min(100,d.referral.shares*4)}%"></i></span>
+    <span class="num"><b>${d.referral.shares}</b></span></div>
+    <div class="row"><span class="nm">Arrivals via ref</span>
+    <span class="bar"><i style="width:${Math.min(100,d.referral.arrivals*4)}%"></i></span>
+    <span class="num"><b>${d.referral.arrivals}</b></span></div>`;
+}
+el('refresh').onclick = load;
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
